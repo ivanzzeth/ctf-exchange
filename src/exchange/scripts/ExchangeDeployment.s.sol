@@ -10,11 +10,12 @@ import { CTFExchange } from "exchange/CTFExchange.sol";
 contract ExchangeDeployment is Script {
     /// @notice Deploys the Exchange contract
     /// @param admin        - The admin for the Exchange
+    /// @param operator     - The operator for the Exchange
     /// @param collateral   - The collateral token address
     /// @param ctf          - The CTF address
     /// @param proxyFactory - The Polymarket proxy factory address
     /// @param safeFactory  - The Polymarket Gnosis Safe factory address
-    function deployExchange(address admin, address collateral, address ctf, address proxyFactory, address safeFactory)
+    function deployExchange(address admin, address operator, address collateral, address ctf, address proxyFactory, address safeFactory)
         public
         returns (address exchange)
     {
@@ -26,9 +27,7 @@ contract ExchangeDeployment is Script {
         exch.addAdmin(admin);
         exch.addOperator(admin);
 
-        // Revoke the deployer's authorization
-        exch.renounceAdminRole();
-        exch.renounceOperatorRole();
+        exch.addOperator(operator);
 
         exchange = address(exch);
     }

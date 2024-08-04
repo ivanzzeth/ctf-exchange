@@ -28,6 +28,7 @@ echo "Deploying CTF Exchange..."
 
 echo "Deploy args:
 Admin: $ADMIN
+Operator: $OPERATOR
 Collateral: $COLLATERAL
 ConditionalTokensFramework: $CTF
 ProxyFactory: $PROXY_FACTORY
@@ -39,8 +40,7 @@ OUTPUT="$(forge script ExchangeDeployment \
     --rpc-url $RPC_URL \
     --json \
     --broadcast \
-    --with-gas-price 200000000000 \
-    -s "deployExchange(address,address,address,address,address)" $ADMIN $COLLATERAL $CTF $PROXY_FACTORY $SAFE_FACTORY)"
+    -s "deployExchange(address,address,address,address,address,address)" $ADMIN $OPERATOR $COLLATERAL $CTF $PROXY_FACTORY $SAFE_FACTORY)"
 
 EXCHANGE=$(echo "$OUTPUT" | grep "{" | jq -r .returns.exchange.value)
 echo "Exchange deployed: $EXCHANGE"
