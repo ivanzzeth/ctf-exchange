@@ -3,6 +3,7 @@ pragma solidity <0.9.0;
 
 import { BaseExchangeTest } from "exchange/test/BaseExchangeTest.sol";
 import { Order, Side, MatchType, OrderStatus, SignatureType } from "exchange/libraries/OrderStructs.sol";
+import { IPolySafeFactory, IGnosisSafe } from "exchange/mixins/PolyFactoryHelper.sol";
 
 contract CTFExchangeTest is BaseExchangeTest {
     function testSetup() public {
@@ -131,6 +132,20 @@ contract CTFExchangeTest is BaseExchangeTest {
 
     function testValidate() public {
         Order memory order = _createAndSignOrder(bobPK, yes, 50_000_000, 100_000_000, Side.BUY);
+        exchange.validateOrder(order);
+    }
+
+    function testValidateSafe() public {
+        setUpBase();
+        (address user, uint256 privateKey) = makeAddrAndKey("user");
+
+        // // safeImpl.setup(_owners, _threshold, to, data, fallbackHandler, paymentToken, payment, paymentReceiver);
+        address[] memory owners = new address[](1);
+        owners[0] = user;
+        bytes memory setupData = abi.encodeWithSelector(IGnosisSafe.setup.selector,
+            owners, 1, address(0), new bytes(0), address(0), address(0), 0, payable(address(0)));
+        address safeAddress = safeFactory.createProxy(address(safeImpl), setupData);
+        Order memory order = _createAndSignSafeOrder(privateKey, safeAddress, yes, 50_000_000, 100_000_000, Side.BUY);
         exchange.validateOrder(order);
     }
 

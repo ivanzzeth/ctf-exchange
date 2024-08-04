@@ -107,6 +107,6 @@ abstract contract Signatures is ISignatures, PolyFactoryHelper {
         view
         returns (bool)
     {
-        return verifyECDSASignature(signer, hash, signature) && getSafeAddress(signer) == safeAddress;
+        return verifyECDSASignature(signer, hash, signature) && checkSafeSignatures(safeAddress, hash, new bytes(0), signature);
     }
 }

@@ -21,8 +21,16 @@ import { IConditionalTokens } from "exchange/interfaces/IConditionalTokens.sol";
 import { CalculatorHelper } from "exchange/libraries/CalculatorHelper.sol";
 import { Order, Side, MatchType, OrderStatus, SignatureType } from "exchange/libraries/OrderStructs.sol";
 
+import { IPolySafeFactory, IGnosisSafe } from "exchange/mixins/PolyFactoryHelper.sol";
+
 contract BaseExchangeTest is TestHelper, IAuthEE, IFeesEE, IRegistryEE, IPausableEE, ITradingEE, ISignaturesEE {
     mapping(address => mapping(address => mapping(uint256 => uint256))) private _checkpoints1155;
+
+    // string memory BASE_RPC_URL = vm.envString("BASE_RPC_URL");
+    string BASE_RPC_URL = "https://base.gateway.tenderly.co";
+    uint256 public baseFork;
+    IPolySafeFactory public safeFactory;
+    IGnosisSafe public safeImpl;
 
     USDC public usdc;
     IConditionalTokens public ctf;
@@ -48,6 +56,7 @@ contract BaseExchangeTest is TestHelper, IAuthEE, IFeesEE, IRegistryEE, IPausabl
     );
 
     function setUp() public virtual {
+        // Setup exchange
         bob = vm.addr(bobPK);
         vm.label(bob, "bob");
         carla = vm.addr(carlaPK);
@@ -67,6 +76,31 @@ contract BaseExchangeTest is TestHelper, IAuthEE, IFeesEE, IRegistryEE, IPausabl
         exchange.registerToken(yes, no, conditionId);
         exchange.addOperator(bob);
         exchange.addOperator(carla);
+        vm.stopPrank();
+    }
+
+    function setUpBase() public virtual {
+         // Gnosis Safe `base` network fork
+        baseFork = vm.createFork(BASE_RPC_URL);
+        vm.selectFork(baseFork);
+        assertEq(vm.activeFork(), baseFork, "fork base network failed");
+
+        vm.rollFork(17_978_700);
+
+        // Setup gnosis safe
+        safeFactory = IPolySafeFactory(address(0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC));
+        safeImpl = IGnosisSafe(address(0xfb1bffC9d739B8D520DaF37dF666da4C687191EA));
+
+        vm.deal(admin, 1 ether);
+
+        vm.startPrank(admin);
+        usdc = new USDC();
+        vm.label(address(usdc), "USDC");
+        ctf = IConditionalTokens(Deployer.ConditionalTokens());
+        vm.label(address(ctf), "CTF");
+        
+        exchange = new CTFExchange(address(usdc), address(ctf), address(0), address(0));
+        exchange.registerToken(yes, no, conditionId);
         vm.stopPrank();
     }
 
@@ -104,6 +138,18 @@ contract BaseExchangeTest is TestHelper, IAuthEE, IFeesEE, IRegistryEE, IPausabl
         return order;
     }
 
+    function _createAndSignSafeOrder(uint256 pk, address safeAddress, uint256 tokenId, uint256 makerAmount, uint256 takerAmount, Side side)
+        internal
+        returns (Order memory)
+    {
+        address signer = vm.addr(pk);
+        address maker = safeAddress;
+        Order memory order = _createSafeOrder(signer, maker, tokenId, makerAmount, takerAmount, side);
+        bytes32 orderHash = exchange.hashOrder(order);
+        order.signature = _signMessage(pk, orderHash);
+        return order;
+    }
+
     function _createOrder(address maker, uint256 tokenId, uint256 makerAmount, uint256 takerAmount, Side side)
         internal
         pure
@@ -121,6 +167,29 @@ contract BaseExchangeTest is TestHelper, IAuthEE, IFeesEE, IRegistryEE, IPausabl
             nonce: 0,
             feeRateBps: 0,
             signatureType: SignatureType.EOA,
+            side: side,
+            signature: new bytes(0)
+        });
+        return order;
+    }
+
+    function _createSafeOrder(address signer, address safeAddress, uint256 tokenId, uint256 makerAmount, uint256 takerAmount, Side side)
+        internal
+        pure
+        returns (Order memory)
+    {
+        Order memory order = Order({
+            salt: 1,
+            signer: signer,
+            maker: safeAddress,
+            taker: address(0),
+            tokenId: tokenId,
+            makerAmount: makerAmount,
+            takerAmount: takerAmount,
+            expiration: 0,
+            nonce: 0,
+            feeRateBps: 0,
+            signatureType: SignatureType.POLY_GNOSIS_SAFE,
             side: side,
             signature: new bytes(0)
         });
